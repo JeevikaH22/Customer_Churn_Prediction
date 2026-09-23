@@ -1,4 +1,4 @@
-#  Customer Churn Prediction
+# Customer Churn Prediction
 
 Predicting telecom customer churn with a tuned XGBoost pipeline, served through a Streamlit app.
 
@@ -6,14 +6,15 @@ Predicting telecom customer churn with a tuned XGBoost pipeline, served through 
 
 ---
 
-## 🔍 Problem
+## Problem
 
 Telecom companies lose significant revenue to customer churn. The goal here was to build a model that flags customers likely to churn *before* they leave, using account and service data (contract type, tenure, billing, add-on services, etc.) — early enough for retention teams to act on it.
 
-## Tech Stack-
+## Tech Stack
 
 | Layer | Tools |
 |---|---|
+| Initial data exploration | SQL |
 | Data & modeling | `pandas`, `numpy`, `scikit-learn`, `xgboost` |
 | Stats / EDA | `scipy` (Chi², Cramér's V), `statsmodels` (VIF) |
 | Model persistence | `joblib` |
@@ -23,12 +24,20 @@ Telecom companies lose significant revenue to customer churn. The goal here was 
 
 ## Project Workflow
 
-### 1. EDA & Statistical Validation
+### 1. SQL — First Look at the Raw Data
+Before any Python touched the data, I queried the raw churn table directly in SQL to get an initial read on the shape of the problem:
+
+- Overall churn counts, and churn broken down by **gender, dependents, partner, phone service, internet service, contract type, and payment method**.
+- Aggregate baselines — **average tenure** and **average monthly charges** — to sanity-check the scale of the numeric features before cleaning.
+
+This gave a quick, dependency-free sense of which categorical splits looked worth digging into, before formalizing that with statistical tests in Python.
+
+### 2. EDA & Statistical Validation
 Before touching a model, I validated which categorical features actually related to churn:
 - **Chi-squared tests** + **Cramér's V** to rank categorical features by association strength with `Churn`.
 - **VIF (Variance Inflation Factor)** on `Tenure`, `MonthlyCharges`, `TotalCharges` to check for multicollinearity between the numeric features.
 
-### 2. Baseline model — Model V1
+### 3. Baseline model — Model V1
 A first XGBoost model on the cleaned (but not engineered) feature set, evaluated at the default 0.5 threshold:
 
 | Metric (churn class) | Score |
@@ -40,7 +49,7 @@ A first XGBoost model on the cleaned (but not engineered) feature set, evaluated
 
 This became the benchmark everything else had to beat.
 
-### 3. Feature engineering — tried, and rejected
+### 4. Feature engineering — tried, and rejected
 I engineered seven new features from domain intuition:
 
 - `TotalServices` — count of active add-on services
@@ -54,7 +63,7 @@ I evaluated these with a Random Forest feature-importance ranking and a **5-fold
 
 **Result: the engineered features didn't produce a meaningful lift over the base set.** Rather than force them into the final pipeline for the sake of having "done feature engineering," I dropped them and moved forward with the original cleaned features. Knowing when engineered signal *isn't* adding value is as important as knowing how to build it.
 
-### 4. Model comparison & tuning — Model V2 (final)
+### 5. Model comparison & tuning — Model V2 (final)
 With the feature question settled, I focused on getting more out of modeling itself:
 
 - Built a `ColumnTransformer` pipeline: `OrdinalEncoder` for binary categoricals, `OneHotEncoder` for multi-class categoricals, `RobustScaler` for numeric features (robust to the outliers/skew in billing amounts).
@@ -62,7 +71,7 @@ With the feature question settled, I focused on getting more out of modeling its
 - Tuned all three with `RandomizedSearchCV`, selected the best on CV ROC-AUC → **XGBoost**.
 - Instead of defaulting to a 0.5 cutoff, I computed the **precision–recall curve** on the held-out test set and picked the threshold that maximizes F1: **0.625**.
 
-### 5. Final results
+### 6. Final results
 
 | Metric (churn class) | Model V1 (baseline) | Model V2 (final) |
 |---|---|---|
@@ -75,7 +84,7 @@ The gain came from **pipeline design, model selection, and threshold tuning** �
 
 ---
 
-## 🖥️ The App
+## The App
 
 A Streamlit interface on top of the final pipeline, with three views:
 
@@ -92,43 +101,40 @@ Risk tiers are bucketed from the predicted probability (🔴 High / 🟠 Elevate
 ```
 .
 ├── app/
-│   └── app.py  
-├── dashboard/
-│   └── churn_dashboard.pbix                                    
+│   └── app.py                                 
+├── sql/
+│   └── churn_analysis.sql                    
 ├── notebooks/
-│   ├── data_cleaning.ipynb 
-│   ├── EDA.ipynb 
-│   ├── model.ipynb                            
-│   └── modelV2.ipynb                        
+│   ├── data_cleaning.ipynb                   
+│   ├── EDA.ipynb                             
+│   ├── model.ipynb                           
+│   └── modelV2.ipynb                         
 ├── models/
-│   └── churn_model_XGB.pkl                  
+│   ├── churn_model_logreg.pkl
+│   └── churn_model_XGB.pkl                    
 ├── data/
+│   ├── customer_churn.zip
+│   ├── Telco-Customer-Churn-raw.csv
 │   ├── Telco-Customer-Churn-cleaned.csv
 │   ├── Telco-Customer-Churn-featured.csv
-│   ├── Telco-Customer-Churn-raw.csv
 │   ├── Telco-Customer-Churn-train-featured.csv
 │   └── Telco-Customer-Churn-test-featured.csv
-├── sql/
-│   └── churn_analysis.sql 
-├── .env
-├── .gitignore
-├── requirements.txt
-└── README.md
+└── screenshots/
 ```
 
 ## ▶️ Running Locally
 
 ```bash
 pip install -r requirements.txt
-streamlit run app.py
+streamlit run app/app.py
 ```
 
 Set `CHURN_MODEL_PATH` if your trained pipeline lives somewhere other than `models/churn_model_XGB.pkl` — or just upload a `.pkl` from the app's sidebar.
 
 ---
 
-## 🔭 What I'd Explore Next
+##  What I'd Explore Next
 
 - Revisit feature engineering with **target encoding** or **interaction terms specific to contract × payment method**, since the manual flags tested here didn't add signal.
 - Try **SHAP** for per-prediction explainability in the app, so the "why" behind a risk score is visible to the end user, not just the score.
-- Calibrate probabilities (Platt/Isotonic) if the output is ever used for anything beyond ranking — raw XGBoost probabilities aren't well-calibrated out of the box.
+- Calibrate probabilities if the output is ever used for anything beyond ranking — raw XGBoost probabilities aren't well-calibrated out of the box.
