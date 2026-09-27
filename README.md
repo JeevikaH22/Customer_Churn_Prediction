@@ -60,6 +60,7 @@ I engineered seven new features from domain intuition:
 - `HighMonthlyCharge` — top-quartile billing flag
 
 I evaluated these with a Random Forest feature-importance ranking and a **5-fold stratified CV comparison across three feature sets — Base vs. Engineered vs. Selected** (top RF features only) — scored on ROC-AUC and F1.
+Also tried SMOTE for imbalance as V3. But failed to achieve better results than V2 model. (V3 file not available since deleted)
 
 **Result: the engineered features didn't produce a meaningful lift over the base set.** Rather than force them into the final pipeline for the sake of having "done feature engineering," I dropped them and moved forward with the original cleaned features. Knowing when engineered signal *isn't* adding value is as important as knowing how to build it.
 
